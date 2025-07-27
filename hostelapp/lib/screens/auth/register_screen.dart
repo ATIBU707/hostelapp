@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -39,7 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (!_acceptTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please accept the terms and conditions')),
@@ -51,27 +53,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _isLoading = true;
     });
 
-    try {
-      // TODO: Implement Supabase registration
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
-      
-      if (mounted) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final success = await authProvider.signUp(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+      fullName: _fullNameController.text.trim(),
+      phone: _phoneController.text.trim(),
+      role: _selectedRole,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration successful! Please verify your email.')),
+          const SnackBar(content: Text('Registration successful! Please check your email to verify your account.')),
         );
         Navigator.pop(context); // Go back to login
-      }
-    } catch (error) {
-      if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration failed: $error')),
+          SnackBar(content: Text(authProvider.errorMessage ?? 'Registration failed. Please try again.')),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
       }
     }
   }
