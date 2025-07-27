@@ -1,16 +1,29 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
+import '../services/resident_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _user;
   Map<String, dynamic>? _userProfile;
+  Map<String, dynamic>? _activeBooking;
+  List<Map<String, dynamic>>? _payments;
+  List<Map<String, dynamic>>? _maintenanceRequests;
+  List<Map<String, dynamic>>? _announcements;
+  List<Map<String, dynamic>>? _availableRooms;
+  List<Map<String, dynamic>>? _staffMembers;
   bool _isLoading = false;
   String? _errorMessage;
 
   // Getters
   User? get user => _user;
   Map<String, dynamic>? get userProfile => _userProfile;
+  Map<String, dynamic>? get activeBooking => _activeBooking;
+  List<Map<String, dynamic>>? get payments => _payments;
+  List<Map<String, dynamic>>? get maintenanceRequests => _maintenanceRequests;
+  List<Map<String, dynamic>>? get announcements => _announcements;
+  List<Map<String, dynamic>>? get availableRooms => _availableRooms;
+  List<Map<String, dynamic>>? get staffMembers => _staffMembers;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _user != null;
@@ -23,16 +36,22 @@ class AuthProvider extends ChangeNotifier {
   void _initializeAuth() {
     _user = AuthService.currentUser;
     if (_user != null) {
-      _loadUserProfile();
+      _loadUserProfile().then((_) => _loadActiveBooking());
     }
 
     // Listen to auth state changes
     AuthService.authStateChanges.listen((AuthState data) {
       _user = data.session?.user;
       if (_user != null) {
-        _loadUserProfile();
+        _loadUserProfile().then((_) => _loadActiveBooking());
       } else {
         _userProfile = null;
+        _activeBooking = null;
+        _payments = null;
+        _maintenanceRequests = null;
+        _announcements = null;
+        _availableRooms = null;
+        _staffMembers = null;
       }
       notifyListeners();
     });
@@ -44,6 +63,50 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       print('Error loading user profile: $e');
+    }
+  }
+
+  Future<void> _loadActiveBooking() async {
+    if (userRole == 'resident') {
+      try {
+        _activeBooking = await ResidentService.getActiveBooking();
+        if (_activeBooking != null) {
+          await _loadPayments();
+          await _loadMaintenanceRequests();
+        }
+        await _loadAnnouncements();
+        notifyListeners();
+      } catch (e) {
+        print('Error loading active booking: $e');
+      }
+    }
+  }
+
+  Future<void> _loadPayments() async {
+    if (_activeBooking == null) return;
+    try {
+      final bookingId = _activeBooking!['id'];
+      _payments = await ResidentService.getPaymentsForBooking(bookingId);
+    } catch (e) {
+      print('Error loading payments: $e');
+    }
+  }
+
+  Future<void> _loadMaintenanceRequests() async {
+    if (_activeBooking == null) return;
+    try {
+      final bookingId = _activeBooking!['id'];
+      _maintenanceRequests = await ResidentService.getMaintenanceRequests(bookingId);
+    } catch (e) {
+      print('Error loading maintenance requests: $e');
+    }
+  }
+
+  Future<void> _loadAnnouncements() async {
+    try {
+      _announcements = await ResidentService.getAnnouncements();
+    } catch (e) {
+      print('Error loading announcements: $e');
     }
   }
 
@@ -99,6 +162,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.user != null) {
         _user = response.user;
         await _loadUserProfile();
+        await _loadActiveBooking();
         _setLoading(false);
         return true;
       } else {
@@ -121,6 +185,12 @@ class AuthProvider extends ChangeNotifier {
       await AuthService.signOut();
       _user = null;
       _userProfile = null;
+      _activeBooking = null;
+      _payments = null;
+      _maintenanceRequests = null;
+      _announcements = null;
+      _availableRooms = null;
+      _staffMembers = null;
       _setLoading(false);
     } catch (e) {
       _setError(_getErrorMessage(e));
@@ -140,6 +210,86 @@ class AuthProvider extends ChangeNotifier {
       _setError(_getErrorMessage(e));
       _setLoading(false);
       return false;
+    }
+  }
+
+  Future<void> createMaintenanceRequest({
+    required String category,
+    required String description,
+  }) async {
+    if (_activeBooking == null) return;
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await ResidentService.createMaintenanceRequest(
+        bookingId: _activeBooking!['id'],
+        category: category,
+        description: description,
+      );
+      await _loadMaintenanceRequests(); // Refresh the list
+      _setLoading(false);
+    } catch (e) {
+      _setError(_getErrorMessage(e));
+      _setLoading(false);
+    }
+  }
+
+  Future<void> fetchAvailableRooms() async {
+    _setLoading(true);
+    try {
+      _availableRooms = await ResidentService.getAvailableRooms();
+    } catch (e) {
+      _setError(_getErrorMessage(e));
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> bookRoom({required int roomId, required int bedId}) async {
+    if (_user == null) return;
+    _setLoading(true);
+    _clearError();
+    try {
+      await ResidentService.createBooking(
+        residentId: _user!.id,
+        roomId: roomId,
+        bedId: bedId,
+      );
+      // Refresh user's booking status
+      await _loadActiveBooking();
+      notifyListeners();
+    } catch (e) {
+      _setError(_getErrorMessage(e));
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> fetchStaffMembers() async {
+    _setLoading(true);
+    try {
+      _staffMembers = await ResidentService.getStaffMembers();
+    } catch (e) {
+      _setError(_getErrorMessage(e));
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> sendMessage({
+    required String receiverId,
+    required String content,
+  }) async {
+    // No loading indicator for sending a message, as it should feel instant.
+    try {
+      await ResidentService.sendMessage(
+        receiverId: receiverId,
+        content: content,
+      );
+    } catch (e) {
+      // Optionally, set an error message if sending fails
+      _setError(_getErrorMessage(e));
     }
   }
 

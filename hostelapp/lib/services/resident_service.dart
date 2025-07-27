@@ -1,0 +1,182 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class ResidentService {
+  static final _supabase = Supabase.instance.client;
+
+  // Fetch the active booking for the current resident
+  static Future<Map<String, dynamic>?> getActiveBooking() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return null;
+
+    try {
+      final response = await _supabase
+          .from('bookings')
+          .select('''
+            id,
+            monthly_rent,
+            room:rooms ( room_number, room_type ),
+            bed:beds ( bed_number )
+          ''')
+          .eq('resident_id', userId)
+          .eq('status', 'active')
+          .limit(1)
+          .single();
+
+      return response;
+    } catch (e) {
+      // This will throw an error if no active booking is found, which is expected.
+      // We can ignore it and return null.
+      print('Error fetching active booking: $e');
+      return null;
+    }
+  }
+
+  // Fetch all payments for a given booking
+  static Future<List<Map<String, dynamic>>> getPaymentsForBooking(String bookingId) async {
+    try {
+      final response = await _supabase
+          .from('payments')
+          .select()
+          .eq('booking_id', bookingId)
+          .order('payment_date', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching payments: $e');
+      return [];
+    }
+  }
+
+  // Fetch all maintenance requests for a given booking
+  static Future<List<Map<String, dynamic>>> getMaintenanceRequests(String bookingId) async {
+    try {
+      final response = await _supabase
+          .from('maintenance_requests')
+          .select()
+          .eq('booking_id', bookingId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching maintenance requests: $e');
+      return [];
+    }
+  }
+
+  // Create a new maintenance request
+  static Future<void> createMaintenanceRequest({
+    required String bookingId,
+    required String category,
+    required String description,
+  }) async {
+    try {
+      await _supabase.from('maintenance_requests').insert({
+        'booking_id': bookingId,
+        'category': category,
+        'description': description,
+        'status': 'pending',
+      });
+    } catch (e) {
+      print('Error creating maintenance request: $e');
+      rethrow;
+    }
+  }
+
+  // Fetch all announcements
+  static Future<List<Map<String, dynamic>>> getAnnouncements() async {
+    try {
+      final response = await _supabase
+          .from('announcements')
+          .select()
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching announcements: $e');
+      return [];
+    }
+  }
+
+  // Fetch all rooms with available beds
+  static Future<List<Map<String, dynamic>>> getAvailableRooms() async {
+    try {
+      final response = await _supabase
+          .from('rooms')
+          .select('*, beds!inner(*)')
+          .eq('beds.is_available', true);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching available rooms: $e');
+      return [];
+    }
+  }
+
+  // Create a new booking
+  static Future<void> createBooking({
+    required String residentId,
+    required int roomId,
+    required int bedId,
+  }) async {
+    try {
+      await _supabase.rpc('create_booking_and_update_bed', params: {
+        'p_resident_id': residentId,
+        'p_room_id': roomId,
+        'p_bed_id': bedId,
+      });
+    } catch (e) {
+      print('Error creating booking: $e');
+      rethrow;
+    }
+  }
+
+  // Fetch all staff and admin members
+  static Future<List<Map<String, dynamic>>> getStaffMembers() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      final response = await _supabase.rpc(
+        'get_staff_members',
+        params: {'p_user_id': userId},
+      );
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching staff members: $e');
+      return [];
+    }
+  }
+
+  // Fetch chat messages between two users
+  static Stream<List<Map<String, dynamic>>> getChatMessages(String receiverId) {
+    final senderId = _supabase.auth.currentUser!.id;
+    return _supabase
+        .from('messages')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: true)
+        .map((maps) => maps.where((map) => 
+            (map['sender_id'] == senderId && map['receiver_id'] == receiverId) || 
+            (map['sender_id'] == receiverId && map['receiver_id'] == senderId)
+        ).toList());
+  }
+
+  // Send a new message
+  static Future<void> sendMessage({
+    required String receiverId,
+    required String content,
+  }) async {
+    final senderId = _supabase.auth.currentUser?.id;
+    if (senderId == null) return;
+
+    try {
+      await _supabase.from('messages').insert({
+        'sender_id': senderId,
+        'receiver_id': receiverId,
+        'content': content,
+      });
+    } catch (e) {
+      print('Error sending message: $e');
+      rethrow;
+    }
+  }
+}
