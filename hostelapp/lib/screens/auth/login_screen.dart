@@ -28,23 +28,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
-    final success = await authProvider.signIn(
+    final route = await authProvider.signIn(
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
 
     if (mounted) {
-      if (success) {
-        // Navigate to appropriate dashboard based on user role
-        final dashboardRoute = authProvider.getDashboardRoute();
-        if (dashboardRoute != '/login') {
-          Navigator.pushReplacementNamed(context, dashboardRoute);
-        } else {
-          // Fallback - show success message if no dashboard route available
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Login successful!')),
-          );
-        }
+      if (route != null) {
+        Navigator.pushReplacementNamed(context, route);
       } else {
         // Show error message from provider
         if (authProvider.errorMessage != null) {

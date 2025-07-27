@@ -12,6 +12,7 @@ import 'screens/resident/edit_profile_screen.dart';
 import 'screens/resident/announcements_screen.dart';
 import 'screens/resident/room_booking_screen.dart';
 import 'screens/resident/staff_list_screen.dart';
+import 'screens/staff/staff_dashboard_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,6 +85,7 @@ class HostelManagerApp extends StatelessWidget {
         '/announcements': (context) => const AnnouncementsScreen(),
         '/book-room': (context) => const RoomBookingScreen(),
         '/staff-list': (context) => const StaffListScreen(),
+        '/staff-dashboard': (context) => const StaffDashboardScreen(),
       },
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
