@@ -48,10 +48,14 @@ CREATE TRIGGER on_profile_updated
 CREATE TABLE public.rooms (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     room_number TEXT NOT NULL UNIQUE,
-    room_type TEXT NOT NULL, -- e.g., 'Private', 'Dorm 4-bed', 'Dorm 6-bed'
+    room_type TEXT NOT NULL, -- e.g., 'single', 'double', 'triple', 'quad', 'dormitory'
     capacity INT NOT NULL,
     price_per_night DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    description TEXT,
+    staff_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'available', -- 'available', 'occupied', 'maintenance'
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Create Beds Table
@@ -110,8 +114,30 @@ CREATE TABLE public.announcements (
 
 -- Rooms RLS
 ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated users can view rooms" ON public.rooms FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Admins can manage rooms" ON public.rooms FOR ALL USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+-- Policy: Everyone can view available rooms (for residents to book)
+CREATE POLICY "Users can view available rooms" ON public.rooms 
+  FOR SELECT USING (status = 'available');
+
+-- Policy: Staff can view their own rooms
+CREATE POLICY "Staff can view their own rooms" ON public.rooms 
+  FOR SELECT USING (staff_id = auth.uid() AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'staff');
+
+-- Policy: Staff can insert their own rooms
+CREATE POLICY "Staff can create rooms" ON public.rooms 
+  FOR INSERT WITH CHECK (staff_id = auth.uid() AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'staff');
+
+-- Policy: Staff can update their own rooms
+CREATE POLICY "Staff can update their own rooms" ON public.rooms 
+  FOR UPDATE USING (staff_id = auth.uid() AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'staff');
+
+-- Policy: Staff can delete their own rooms
+CREATE POLICY "Staff can delete their own rooms" ON public.rooms 
+  FOR DELETE USING (staff_id = auth.uid() AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'staff');
+
+-- Policy: Admins can manage all rooms
+CREATE POLICY "Admins can manage all rooms" ON public.rooms 
+  FOR ALL USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
 
 -- Beds RLS
 ALTER TABLE public.beds ENABLE ROW LEVEL SECURITY;

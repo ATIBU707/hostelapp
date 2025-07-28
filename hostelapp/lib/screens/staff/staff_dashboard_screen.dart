@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import 'add_room_screen.dart';
+import 'reservation_approval_screen.dart';
+import 'staff_reports_screen.dart';
+import 'staff_chat_screen.dart';
+import 'staff_profile_screen.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
   const StaffDashboardScreen({super.key});
@@ -17,12 +22,18 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     // Load staff data when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      authProvider.fetchStaffMaintenanceRequests();
+      _loadStaffData(authProvider);
     });
+  }
+
+  void _loadStaffData(AuthProvider authProvider) {
+    // Load all staff-specific data with access control
+    authProvider.fetchStaffMaintenanceRequests();
+    // TODO: Add other data loading methods
   }
 
   @override
@@ -48,13 +59,20 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {
-                authProvider.fetchStaffMaintenanceRequests();
+                _loadStaffData(authProvider);
               },
             ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.account_circle),
               onSelected: (value) async {
-                if (value == 'logout') {
+                if (value == 'profile') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const StaffProfileScreen(),
+                    ),
+                  );
+                } else if (value == 'logout') {
                   await authProvider.signOut();
                   if (context.mounted) {
                     Navigator.of(context).pushReplacementNamed('/login');
@@ -76,9 +94,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
                   value: 'logout',
                   child: Row(
                     children: [
-                      Icon(Icons.logout, size: 20),
-                      SizedBox(width: 8),
-                      Text('Logout'),
+                      const Icon(Icons.logout, size: 20),
+                      const SizedBox(width: 8),
+                      const Text('Logout'),
                     ],
                   ),
                 ),
@@ -130,22 +148,31 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
                 labelColor: Colors.indigo,
                 unselectedLabelColor: Colors.grey[600],
                 indicatorColor: Colors.indigo,
+                isScrollable: true,
                 tabs: const [
                   Tab(
                     icon: Icon(Icons.dashboard),
                     text: 'Overview',
                   ),
                   Tab(
-                    icon: Icon(Icons.build),
-                    text: 'Maintenance',
+                    icon: Icon(Icons.add_home),
+                    text: 'Add Room',
                   ),
                   Tab(
-                    icon: Icon(Icons.announcement),
-                    text: 'Announcements',
+                    icon: Icon(Icons.approval),
+                    text: 'Reservations',
                   ),
                   Tab(
-                    icon: Icon(Icons.people),
-                    text: 'Residents',
+                    icon: Icon(Icons.analytics),
+                    text: 'Reports',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.chat),
+                    text: 'Chat',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.person),
+                    text: 'Profile',
                   ),
                 ],
               ),
@@ -156,9 +183,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
                 controller: _tabController,
                 children: [
                   _buildOverviewTab(authProvider),
-                  _buildMaintenanceTab(authProvider),
-                  _buildAnnouncementsTab(authProvider),
-                  _buildResidentsTab(authProvider),
+                  const AddRoomScreen(),
+                  const ReservationApprovalScreen(),
+                  const StaffReportsScreen(),
+                  const StaffChatScreen(),
+                  const StaffProfileScreen(),
                 ],
               ),
             ),
@@ -262,132 +291,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
     );
   }
 
-  Widget _buildMaintenanceTab(AuthProvider authProvider) {
-    final maintenanceRequests = authProvider.staffMaintenanceRequests ?? [];
 
-    return Column(
-      children: [
-        // Filter Bar
-        Container(
-          padding: const EdgeInsets.all(16),
-          color: Colors.grey[50],
-          child: Row(
-            children: [
-              const Text(
-                'Maintenance Requests',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.filter_list),
-                onPressed: () {
-                  // TODO: Implement filtering
-                },
-              ),
-            ],
-          ),
-        ),
-        // Requests List
-        Expanded(
-          child: authProvider.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : maintenanceRequests.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.build_outlined,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'No maintenance requests',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Requests from residents will appear here',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: maintenanceRequests.length,
-                      itemBuilder: (context, index) {
-                        final request = maintenanceRequests[index];
-                        return _buildDetailedRequestCard(request);
-                      },
-                    ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAnnouncementsTab(AuthProvider authProvider) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.announcement_outlined,
-            size: 64,
-            color: Colors.grey,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Announcements',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Create and manage hostel announcements',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResidentsTab(AuthProvider authProvider) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.people_outlined,
-            size: 64,
-            color: Colors.grey,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Residents Management',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'View and manage resident information',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildStatCard(String title, String value, Color color, IconData icon) {
     return Card(

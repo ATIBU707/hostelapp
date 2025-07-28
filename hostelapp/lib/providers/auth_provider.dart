@@ -307,6 +307,135 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Room Management (Staff Only)
+  Future<void> addRoom({
+    required String roomNumber,
+    required String roomType,
+    required int capacity,
+    required double rentAmount,
+    String? description,
+  }) async {
+    if (_user == null || userRole != 'staff') {
+      throw Exception('Only staff members can add rooms');
+    }
+    
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      // Insert room into Supabase
+      final response = await Supabase.instance.client
+          .from('rooms')
+          .insert({
+            'room_number': roomNumber,
+            'room_type': roomType,
+            'capacity': capacity,
+            // 'price_per_night': rentAmount,
+            'description': description,
+            'staff_id': _user!.id, // Associate room with staff member
+            'status': 'available',
+            'created_at': DateTime.now().toIso8601String(),
+          })
+          .select()
+          .single();
+      
+      // Create beds for the room based on capacity
+      final roomId = response['id'];
+      final List<Map<String, dynamic>> beds = [];
+      
+      for (int i = 1; i <= capacity; i++) {
+        beds.add({
+          'room_id': roomId,
+          'bed_number': i.toString(),
+          'is_available': true,
+        });
+      }
+      
+      // Insert beds into Supabase
+      if (beds.isNotEmpty) {
+        await Supabase.instance.client
+            .from('beds')
+            .insert(beds);
+      }
+      
+      // Refresh available rooms data
+      await fetchAvailableRooms();
+      
+    } catch (e) {
+      _setError('Failed to add room: ${_getErrorMessage(e)}');
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // Fetch available rooms for residents
+  // Future<void> fetchAvailableRooms() async {
+  //   _setLoading(true);
+  //   _clearError();
+    
+  //   try {
+  //     final response = await Supabase.instance.client
+  //         .from('rooms')
+  //         .select('''
+  //           *,
+  //           beds!inner(
+  //             id,
+  //             bed_number,
+  //             is_available
+  //           )
+  //         ''')
+  //         .eq('status', 'available');
+      
+  //     _availableRooms = List<Map<String, dynamic>>.from(response);
+      
+  //   } catch (e) {
+  //     _setError('Failed to load available rooms: ${_getErrorMessage(e)}');
+  //   } finally {
+  //     _setLoading(false);
+  //     notifyListeners();
+  //   }
+  // }
+  
+  // Fetch rooms managed by current staff member
+  Future<List<Map<String, dynamic>>> fetchStaffRooms() async {
+    if (_user == null || userRole != 'staff') {
+      throw Exception('Only staff members can access this data');
+    }
+    
+    try {
+      final response = await Supabase.instance.client
+          .from('rooms')
+          .select('''
+            *,
+            beds(
+              id,
+              bed_number,
+              is_available
+            ),
+            bookings(
+              id,
+              resident_id,
+              check_in_date,
+              check_out_date,
+              status,
+              profiles!bookings_resident_id_fkey(
+                full_name,
+                phone
+              )
+            )
+          ''')
+          .eq('staff_id', _user!.id)
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+      
+    } catch (e) {
+      _setError('Failed to load staff rooms: ${_getErrorMessage(e)}');
+      rethrow;
+    }
+  }
+
   // Profile Management
   Future<void> updateProfile({
     required String fullName,
