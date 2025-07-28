@@ -50,7 +50,7 @@ CREATE TABLE public.rooms (
     room_number TEXT NOT NULL UNIQUE,
     room_type TEXT NOT NULL, -- e.g., 'single', 'double', 'triple', 'quad', 'dormitory'
     capacity INT NOT NULL,
-    price_per_night DECIMAL(10, 2) NOT NULL,
+    price_per_semester DECIMAL(10, 2) NOT NULL,
     description TEXT,
     staff_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'available', -- 'available', 'occupied', 'maintenance'

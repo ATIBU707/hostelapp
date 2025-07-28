@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import 'add_room_screen.dart';
+import 'manage_rooms_screen.dart';
 import 'reservation_approval_screen.dart';
 import 'staff_reports_screen.dart';
 import 'staff_chat_screen.dart';
@@ -22,7 +23,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     // Load staff data when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -159,6 +160,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
                     text: 'Add Room',
                   ),
                   Tab(
+                    icon: Icon(Icons.home_work),
+                    text: 'My Rooms',
+                  ),
+                  Tab(
                     icon: Icon(Icons.approval),
                     text: 'Reservations',
                   ),
@@ -184,6 +189,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
                 children: [
                   _buildOverviewTab(authProvider),
                   const AddRoomScreen(),
+                  const ManageRoomsScreen(),
                   const ReservationApprovalScreen(),
                   const StaffReportsScreen(),
                   const StaffChatScreen(),

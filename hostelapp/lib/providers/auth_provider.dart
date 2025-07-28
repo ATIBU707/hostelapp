@@ -490,6 +490,42 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Room Management Methods
+
+  Future<List<Map<String, dynamic>>> getStaffRooms() async {
+    if (_user == null) throw Exception('User not authenticated');
+    
+    return await StaffService.getStaffRooms(_user!.id);
+  }
+
+  Future<void> updateRoom({
+    required String roomId,
+    required String roomNumber,
+    required String roomType,
+    required int capacity,
+    required double rentAmount,
+    String? description,
+    required bool isAvailable,
+  }) async {
+    if (_user == null) throw Exception('User not authenticated');
+    
+    await StaffService.updateRoom(
+      roomId: roomId,
+      roomNumber: roomNumber,
+      roomType: roomType,
+      capacity: capacity,
+      rentAmount: rentAmount,
+      description: description,
+      isAvailable: isAvailable,
+    );
+  }
+
+  Future<void> deleteRoom(String roomId) async {
+    if (_user == null) throw Exception('User not authenticated');
+    
+    await StaffService.deleteRoom(roomId);
+  }
+
   String _getErrorMessage(dynamic error) {
     if (error is AuthException) {
       return error.message;
@@ -499,4 +535,5 @@ class AuthProvider extends ChangeNotifier {
       return error.toString();
     }
   }
+
 }
