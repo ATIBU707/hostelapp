@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/staff_service.dart';
@@ -31,24 +32,29 @@ class _ReservationApprovalScreenState extends State<ReservationApprovalScreen> {
 
       final bookings = authProvider.staffBookings;
       
-      // Transform data to match the UI widget's expected structure
       _pendingReservations = bookings.map((booking) {
-        final resident = booking['residents'] ?? {};
-        final room = booking['rooms'] ?? {};
+        final checkInDateStr = booking['check_in_date'];
+        DateTime? checkInDate = checkInDateStr != null ? DateTime.parse(checkInDateStr) : null;
         
+        String formattedCheckInDate = checkInDate != null ? DateFormat('dd/MM/yyyy').format(checkInDate) : '--';
+        String formattedCheckOutDate = checkInDate != null ? DateFormat('dd/MM/yyyy').format(DateTime(checkInDate.year, checkInDate.month + 4, checkInDate.day)) : '--';
+
+        final profiles = booking['profiles'] ?? {};
+        final rooms = booking['rooms'] ?? {};
+
         return {
           'id': booking['id'].toString(),
-          'resident_name': resident['full_name'] ?? 'N/A',
-          'resident_email': resident['email'] ?? 'N/A',
-          'resident_phone': resident['phone'] ?? 'N/A',
-          'room_number': room['room_number'] ?? 'N/A',
-          'room_type': room['room_type'] ?? 'N/A',
-          'check_in_date': booking['start_date'] ?? 'N/A',
-          'check_out_date': booking['end_date'] ?? 'N/A',
-          'rent_amount': room['rent_amount']?.toDouble() ?? 0.0,
+          'resident_name': profiles['full_name'] ?? '--',
+          'resident_email': profiles['email'] ?? '--',
+          'resident_phone': profiles['phone'] ?? '--',
+          'room_number': rooms['room_number'] ?? '--',
+          'room_type': rooms['room_type'] ?? '--',
+          'check_in_date': formattedCheckInDate,
+          'check_out_date': formattedCheckOutDate,
+          'rent_amount': booking['monthly_rent']?.toDouble() ?? rooms['rent_amount']?.toDouble() ?? 0.0,
           'status': booking['status'] ?? 'pending',
-          'created_at': booking['created_at'] ?? 'N/A',
-          'duration_months': booking['duration_months'] ?? 0,
+          'created_at': booking['created_at'] ?? '--',
+          'duration_months': 4, // Fixed duration
         };
       }).toList();
 
@@ -355,7 +361,7 @@ class _ReservationApprovalScreenState extends State<ReservationApprovalScreen> {
               children: [
                 Icon(Icons.room, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 4),
-                Text('Room ${reservation['room_number']} (${reservation['room_type']})'),
+                Text('Room ${reservation['room_number']} (${(reservation['room_type'] ?? '--').toString().toUpperCase()})'),
               ],
             ),
             const SizedBox(height: 4),
@@ -371,7 +377,7 @@ class _ReservationApprovalScreenState extends State<ReservationApprovalScreen> {
               children: [
                 Icon(Icons.attach_money, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 4),
-                Text('UGX ${reservation['rent_amount']}/month'),
+                Text('USD ${reservation['rent_amount']}/month'),
               ],
             ),
             const SizedBox(height: 12),

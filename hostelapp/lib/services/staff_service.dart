@@ -102,18 +102,15 @@ class StaffService {
           .from('bookings')
           .select('''
             *,
-            room:rooms!inner(
-              id,
+            rooms!inner(
               room_number,
               room_type,
               rent_amount
             ),
-            bed:beds(
-              id,
+            beds!inner(
               bed_number
             ),
-            resident:profiles!bookings_resident_id_fkey(
-              id,
+            profiles!inner(
               full_name,
               phone,
               email

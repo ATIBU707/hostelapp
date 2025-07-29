@@ -50,7 +50,7 @@ CREATE TABLE public.rooms (
     room_number TEXT NOT NULL UNIQUE,
     room_type TEXT NOT NULL, -- e.g., 'single', 'double', 'triple', 'quad', 'dormitory'
     capacity INT NOT NULL,
-    price_per_semester DECIMAL(10, 2) NOT NULL,
+    rent_amount DECIMAL(10, 2) NOT NULL,
     description TEXT,
     staff_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'available', -- 'available', 'occupied', 'maintenance'
@@ -73,6 +73,7 @@ CREATE TABLE public.bookings (
     resident_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     room_id BIGINT NOT NULL REFERENCES public.rooms(id) ON DELETE CASCADE,
     bed_id BIGINT NOT NULL REFERENCES public.beds(id) ON DELETE CASCADE,
+    monthly_rent DECIMAL(10, 2),
     check_in_date DATE NOT NULL,
     check_out_date DATE,
     status TEXT NOT NULL DEFAULT 'active', -- e.g., 'active', 'completed', 'cancelled'
