@@ -150,30 +150,19 @@ class StaffService {
   // Chat functionality for staff
   static Future<List<Map<String, dynamic>>> getStaffChatContacts(String staffId) async {
     try {
-      // Get all residents who have bookings in this staff member's rooms
+      // Get all residents - staff can chat with any resident
       final response = await _supabase
-          .from('bookings')
+          .from('profiles')
           .select('''
-            resident:profiles!bookings_resident_id_fkey(
-              id,
-              full_name,
-              phone,
-              email
-            )
+            id,
+            full_name,
+            phone,
+            email
           ''')
-          .eq('rooms.staff_id', staffId)
-          .eq('status', 'active');
+          .eq('role', 'resident')
+          .order('full_name', ascending: true);
       
-      // Remove duplicates and extract resident info
-      final uniqueResidents = <String, Map<String, dynamic>>{};
-      for (final booking in response) {
-        final resident = booking['resident'];
-        if (resident != null) {
-          uniqueResidents[resident['id']] = resident;
-        }
-      }
-      
-      return uniqueResidents.values.toList();
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('Error fetching staff chat contacts: $e');
       return [];

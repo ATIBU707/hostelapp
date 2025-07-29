@@ -10,6 +10,8 @@ class RoomBookingScreen extends StatefulWidget {
 }
 
 class _RoomBookingScreenState extends State<RoomBookingScreen> {
+  final Set<String> _bookedBedIds = {};
+  
   @override
   void initState() {
     super.initState();
@@ -250,28 +252,35 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                         const SizedBox(height: 8),
                         
                         ...beds.map((bed) {
+                          final bedId = bed['id'].toString();
+                          final isBooked = _bookedBedIds.contains(bedId);
+                          
                           return Container(
                             margin: const EdgeInsets.symmetric(vertical: 4),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey[300]!),
                               borderRadius: BorderRadius.circular(8),
+                              color: isBooked ? Colors.grey[100] : null,
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.bed,
-                                  color: Colors.grey[600],
+                                  color: isBooked ? Colors.grey[400] : Colors.grey[600],
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Bed ${bed['bed_number']}',
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: isBooked ? Colors.grey[600] : Colors.black,
+                                    ),
                                   ),
                                 ),
                                 ElevatedButton.icon(
-                                  onPressed: () async {
+                                  onPressed: isBooked ? null : () async {
                                     // Show confirmation dialog
                                     final confirmed = await showDialog<bool>(
                                       context: context,
@@ -294,25 +303,50 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                                     );
                                     
                                     if (confirmed == true) {
-                                      await authProvider.bookRoom(
-                                        roomId: room['id'],
-                                        bedId: bed['id'],
-                                      );
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Booking successful!'),
-                                            backgroundColor: Colors.green,
-                                          ),
+                                      try {
+                                        await authProvider.bookRoom(
+                                          roomId: room['id'].toString(),
+                                          bedId: bed['id'].toString(),
                                         );
-                                        Navigator.pop(context); // Go back after booking
+                                        
+                                        if (mounted) {
+                                          setState(() {
+                                            _bookedBedIds.add(bedId);
+                                          });
+                                          
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Booking successful!'),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                          
+                                          // Navigate back after a short delay
+                                          Future.delayed(const Duration(seconds: 1), () {
+                                            if (mounted) {
+                                              Navigator.pop(context);
+                                            }
+                                          });
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Booking failed: ${e.toString()}'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
                                       }
                                     }
                                   },
-                                  icon: const Icon(Icons.book_online, size: 16),
-                                  label: const Text('Book'),
+                                  icon: Icon(
+                                    isBooked ? Icons.check_circle_outline : Icons.book_online, 
+                                    size: 16
+                                  ),
+                                  label: Text(isBooked ? 'Reserved' : 'Book'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
+                                    backgroundColor: isBooked ? Colors.grey : Colors.green,
                                     foregroundColor: Colors.white,
                                   ),
                                 ),

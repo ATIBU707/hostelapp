@@ -90,17 +90,15 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
         throw Exception('Staff ID not found');
       }
 
-      final contacts = await StaffService.getStaffChatContacts(staffId);
+      final residents = await StaffService.getStaffChatContacts(staffId);
 
       // Transform data to match the UI widget's expected structure
-      _residents = contacts.map((contact) {
-        final resident = contact['residents'] ?? {};
-        final room = contact['rooms'] ?? {};
+      _residents = residents.map((resident) {
         return {
           'id': resident['id'],
           'name': resident['full_name'] ?? 'N/A',
           'email': resident['email'] ?? 'N/A',
-          'room_number': room['room_number'] ?? 'N/A',
+          'room_number': 'N/A', // Room info not available in universal chat
           'phone': resident['phone'] ?? 'N/A',
           'last_message': 'Tap to start chatting...', // Placeholder
           'last_message_time': DateTime.now().toIso8601String(), // Placeholder
@@ -312,7 +310,7 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
                       Icon(Icons.people, color: Colors.indigo),
                       SizedBox(width: 8),
                       Text(
-                        'Your Residents',
+                        'All Residents',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,

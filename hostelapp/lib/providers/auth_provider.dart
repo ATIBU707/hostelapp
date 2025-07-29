@@ -253,7 +253,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> bookRoom({required int roomId, required int bedId}) async {
+  Future<void> bookRoom({required String roomId, required String bedId}) async {
     if (_user == null) return;
     _setLoading(true);
     _clearError();

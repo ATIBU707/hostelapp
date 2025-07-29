@@ -182,8 +182,8 @@ class ResidentService {
   // Create a new booking
   static Future<void> createBooking({
     required String residentId,
-    required int roomId,
-    required int bedId,
+    required String roomId,
+    required String bedId,
   }) async {
     try {
       print('Creating booking with params: residentId=$residentId, roomId=$roomId, bedId=$bedId');
