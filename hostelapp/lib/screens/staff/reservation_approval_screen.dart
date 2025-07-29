@@ -113,7 +113,7 @@ class _ReservationApprovalScreenState extends State<ReservationApprovalScreen> {
               _buildDetailRow('Check-in', reservation['check_in_date']),
               _buildDetailRow('Check-out', reservation['check_out_date']),
               _buildDetailRow('Duration', '${reservation['duration_months']} months'),
-              _buildDetailRow('Rent Amount', '\$${reservation['rent_amount']}'),
+              _buildDetailRow('Rent Amount', 'UGX${reservation['rent_amount']}'),
               _buildDetailRow('Status', reservation['status'].toString().toUpperCase()),
               if (reservation['rejection_reason'] != null)
                 _buildDetailRow('Rejection Reason', reservation['rejection_reason']),
