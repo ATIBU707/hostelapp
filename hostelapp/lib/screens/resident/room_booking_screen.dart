@@ -10,15 +10,31 @@ class RoomBookingScreen extends StatefulWidget {
 }
 
 class _RoomBookingScreenState extends State<RoomBookingScreen> {
-  final Set<String> _bookedBedIds = {};
-  
+  Map<String, String> _bookingStatuses = {};
+
   @override
   void initState() {
     super.initState();
-    // Fetch available rooms when the screen is first loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AuthProvider>(context, listen: false).fetchAvailableRooms();
+      _loadInitialData();
     });
+  }
+
+  Future<void> _loadInitialData() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.fetchAvailableRooms();
+    await authProvider.fetchResidentBookings();
+    _updateBookingStatuses();
+  }
+
+  void _updateBookingStatuses() {
+    final bookings = Provider.of<AuthProvider>(context, listen: false).residentBookings;
+        final Map<String, String> statuses = { for (var booking in bookings) booking['bed_id'].toString() : booking['status'] };
+    if (mounted) {
+      setState(() {
+        _bookingStatuses = statuses;
+      });
+    }
   }
 
   @override
@@ -118,7 +134,7 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () => authProvider.fetchAvailableRooms(),
+            onRefresh: _loadInitialData,
             child: ListView.builder(
               padding: const EdgeInsets.all(8.0),
               itemCount: rooms.length,
@@ -253,7 +269,7 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                         
                         ...beds.map((bed) {
                           final bedId = bed['id'].toString();
-                          final isBooked = _bookedBedIds.contains(bedId);
+                          final bookingStatus = _bookingStatuses[bedId];
                           
                           return Container(
                             margin: const EdgeInsets.symmetric(vertical: 4),
@@ -261,13 +277,13 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey[300]!),
                               borderRadius: BorderRadius.circular(8),
-                              color: isBooked ? Colors.grey[100] : null,
+                              color: bookingStatus != null ? Colors.grey[100] : null,
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.bed,
-                                  color: isBooked ? Colors.grey[400] : Colors.grey[600],
+                                  color: bookingStatus != null ? Colors.grey[400] : Colors.grey[600],
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
@@ -275,12 +291,12 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                                     'Bed ${bed['bed_number']}',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w500,
-                                      color: isBooked ? Colors.grey[600] : Colors.black,
+                                      color: bookingStatus != null ? Colors.grey[600] : Colors.black,
                                     ),
                                   ),
                                 ),
                                 ElevatedButton.icon(
-                                  onPressed: isBooked ? null : () async {
+                                  onPressed: bookingStatus != null ? null : () async {
                                     // Show confirmation dialog
                                     final confirmed = await showDialog<bool>(
                                       context: context,
@@ -310,23 +326,20 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                                         );
                                         
                                         if (mounted) {
+                                          // Update the status locally for immediate feedback
                                           setState(() {
-                                            _bookedBedIds.add(bedId);
+                                            _bookingStatuses[bedId] = 'pending';
                                           });
-                                          
+
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             const SnackBar(
-                                              content: Text('Booking successful!'),
-                                              backgroundColor: Colors.green,
+                                              content: Text('Booking request sent! Your booking is pending approval.'),
+                                              backgroundColor: Colors.orange,
                                             ),
                                           );
-                                          
-                                          // Navigate back after a short delay
-                                          Future.delayed(const Duration(seconds: 1), () {
-                                            if (mounted) {
-                                              Navigator.pop(context);
-                                            }
-                                          });
+
+                                          // Refresh data to ensure consistency
+                                          _loadInitialData();
                                         }
                                       } catch (e) {
                                         if (mounted) {
@@ -341,12 +354,30 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                                     }
                                   },
                                   icon: Icon(
-                                    isBooked ? Icons.check_circle_outline : Icons.book_online, 
+                                    bookingStatus == 'approved' 
+                                        ? Icons.check_circle 
+                                        : bookingStatus == 'pending' 
+                                            ? Icons.hourglass_empty
+                                            : Icons.book_online,
                                     size: 16
                                   ),
-                                  label: Text(isBooked ? 'Reserved' : 'Book'),
+                                  label: Text(
+                                    bookingStatus == 'approved'
+                                        ? 'Reserved'
+                                        : bookingStatus == 'pending'
+                                            ? 'Pending'
+                                            : bookingStatus == 'rejected'
+                                                ? 'Rejected'
+                                                : 'Book'
+                                  ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isBooked ? Colors.grey : Colors.green,
+                                    backgroundColor: bookingStatus == 'approved'
+                                        ? Colors.blue
+                                        : bookingStatus == 'pending'
+                                            ? Colors.orange
+                                            : bookingStatus == 'rejected'
+                                                ? Colors.red
+                                                : Colors.green,
                                     foregroundColor: Colors.white,
                                   ),
                                 ),

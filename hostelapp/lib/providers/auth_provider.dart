@@ -15,6 +15,7 @@ class AuthProvider extends ChangeNotifier {
   List<Map<String, dynamic>>? _availableRooms;
   List<Map<String, dynamic>>? _staffMembers;
   List<Map<String, dynamic>>? _staffMaintenanceRequests;
+  List<Map<String, dynamic>> _residentBookings = [];
   List<Map<String, dynamic>> _staffBookings = [];
   List<Map<String, dynamic>> get staffBookings => _staffBookings;
   bool _isLoading = false;
@@ -30,6 +31,7 @@ class AuthProvider extends ChangeNotifier {
   List<Map<String, dynamic>>? get availableRooms => _availableRooms;
   List<Map<String, dynamic>>? get staffMembers => _staffMembers;
   List<Map<String, dynamic>>? get staffMaintenanceRequests => _staffMaintenanceRequests;
+  List<Map<String, dynamic>> get residentBookings => _residentBookings;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _user != null;
@@ -89,6 +91,7 @@ class AuthProvider extends ChangeNotifier {
         await _loadMaintenanceRequests();
       }
       // await _loadAnnouncements();
+      await fetchResidentBookings();
     } catch (e) {
       _setError('Failed to load resident data: ${_getErrorMessage(e)}');
     } finally {
@@ -250,6 +253,18 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
       notifyListeners();
+    }
+  }
+
+  Future<void> fetchResidentBookings() async {
+    if (userRole != 'resident') return;
+    _setLoading(true);
+    try {
+      _residentBookings = await ResidentService.getResidentBookings();
+    } catch (e) {
+      _setError('Failed to load your bookings: ${_getErrorMessage(e)}');
+    } finally {
+      _setLoading(false);
     }
   }
 

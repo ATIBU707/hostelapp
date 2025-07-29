@@ -176,19 +176,23 @@ CREATE POLICY "Admins can manage announcements" ON public.announcements FOR ALL 
 -- 8. Create Stored Procedure for Booking
 CREATE OR REPLACE FUNCTION public.create_booking_and_update_bed(
     p_resident_id UUID,
-    p_room_id BIGINT,
-    p_bed_id BIGINT
+    p_room_id UUID,
+    p_bed_id UUID
 )
 RETURNS void AS $$
+DECLARE
+    v_rent_amount DECIMAL;
 BEGIN
-    -- Create the new booking
-    INSERT INTO public.bookings (resident_id, room_id, bed_id, check_in_date, status)
-    VALUES (p_resident_id, p_room_id, p_bed_id, CURRENT_DATE, 'active');
+    -- Fetch rent amount from rooms table
+    SELECT rent_amount INTO v_rent_amount
+    FROM public.rooms
+    WHERE id = p_room_id;
 
-    -- Update the bed's availability
-    UPDATE public.beds
-    SET is_available = false
-    WHERE id = p_bed_id;
+    -- Create the new booking with pending status and fetched rent amount
+    INSERT INTO public.bookings (resident_id, room_id, bed_id, check_in_date, status, monthly_rent)
+    VALUES (p_resident_id, p_room_id, p_bed_id, CURRENT_DATE, 'pending', v_rent_amount);
+
+    -- Note: Bed availability is not updated until booking is approved
 END;
 $$ LANGUAGE plpgsql;
 

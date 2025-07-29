@@ -371,7 +371,7 @@ class _ReservationApprovalScreenState extends State<ReservationApprovalScreen> {
               children: [
                 Icon(Icons.attach_money, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 4),
-                Text('\$${reservation['rent_amount']}/month'),
+                Text('UGX ${reservation['rent_amount']}/month'),
               ],
             ),
             const SizedBox(height: 12),

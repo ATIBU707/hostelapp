@@ -224,6 +224,25 @@ class ResidentService {
     }
   }
 
+  // Fetch all bookings for the current resident
+  static Future<List<Map<String, dynamic>>> getResidentBookings() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      final response = await _supabase
+          .from('bookings')
+          .select('bed_id, status')
+          .eq('resident_id', userId);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching resident bookings: $e');
+      return [];
+    }
+  }
+
+
   // Fetch all staff and admin members
   static Future<List<Map<String, dynamic>>> getStaffMembers() async {
     final userId = _supabase.auth.currentUser?.id;
