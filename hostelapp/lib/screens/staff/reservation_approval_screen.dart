@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/staff_service.dart';
 
 class ReservationApprovalScreen extends StatefulWidget {
   const ReservationApprovalScreen({super.key});
@@ -24,51 +25,33 @@ class _ReservationApprovalScreenState extends State<ReservationApprovalScreen> {
 
   Future<void> _loadReservations() async {
     setState(() => _isLoading = true);
-    
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final staffId = authProvider.userProfile?['id'];
-      
-      if (staffId == null) {
-        throw Exception('Staff ID not found');
-      }
+      await authProvider.fetchStaffBookings();
 
-      // TODO: Implement reservation fetching in AuthProvider
-      // Only fetch reservations for rooms managed by this staff member
-      // _pendingReservations = await authProvider.getStaffReservations(staffId);
+      final bookings = authProvider.staffBookings;
       
-      // Mock data for demonstration
-      _pendingReservations = [
-        {
-          'id': '1',
-          'resident_name': 'John Doe',
-          'resident_email': 'john@example.com',
-          'room_number': '101',
-          'room_type': 'single',
-          'check_in_date': '2024-02-01',
-          'check_out_date': '2024-06-01',
-          'rent_amount': 5000.0,
-          'status': 'pending',
-          'created_at': '2024-01-15T10:30:00Z',
-          'resident_phone': '+1234567890',
-          'duration_months': 4,
-        },
-        {
-          'id': '2',
-          'resident_name': 'Jane Smith',
-          'resident_email': 'jane@example.com',
-          'room_number': '102',
-          'room_type': 'double',
-          'check_in_date': '2024-02-15',
-          'check_out_date': '2024-08-15',
-          'rent_amount': 7000.0,
-          'status': 'pending',
-          'created_at': '2024-01-20T14:20:00Z',
-          'resident_phone': '+1234567891',
-          'duration_months': 6,
-        },
-      ];
-      
+      // Transform data to match the UI widget's expected structure
+      _pendingReservations = bookings.map((booking) {
+        final resident = booking['residents'] ?? {};
+        final room = booking['rooms'] ?? {};
+        
+        return {
+          'id': booking['id'].toString(),
+          'resident_name': resident['full_name'] ?? 'N/A',
+          'resident_email': resident['email'] ?? 'N/A',
+          'resident_phone': resident['phone'] ?? 'N/A',
+          'room_number': room['room_number'] ?? 'N/A',
+          'room_type': room['room_type'] ?? 'N/A',
+          'check_in_date': booking['start_date'] ?? 'N/A',
+          'check_out_date': booking['end_date'] ?? 'N/A',
+          'rent_amount': room['rent_amount']?.toDouble() ?? 0.0,
+          'status': booking['status'] ?? 'pending',
+          'created_at': booking['created_at'] ?? 'N/A',
+          'duration_months': booking['duration_months'] ?? 0,
+        };
+      }).toList();
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -79,27 +62,18 @@ class _ReservationApprovalScreenState extends State<ReservationApprovalScreen> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if(mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _updateReservationStatus(String reservationId, String status, {String? reason}) async {
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      // TODO: Implement reservation status update in AuthProvider
-      // await authProvider.updateReservationStatus(reservationId, status, reason);
-      
-      // Update local state
-      setState(() {
-        final index = _pendingReservations.indexWhere((r) => r['id'] == reservationId);
-        if (index != -1) {
-          _pendingReservations[index]['status'] = status;
-          if (reason != null) {
-            _pendingReservations[index]['rejection_reason'] = reason;
-          }
-        }
-      });
+      await StaffService.updateBookingStatus(bookingId: reservationId, status: status);
+
+      // Refresh the list after updating
+      await _loadReservations();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

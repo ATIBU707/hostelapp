@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/staff_service.dart';
+import '../../services/chat_service.dart';
 
 class StaffChatScreen extends StatefulWidget {
   const StaffChatScreen({super.key});
@@ -10,6 +13,7 @@ class StaffChatScreen extends StatefulWidget {
 }
 
 class _StaffChatScreenState extends State<StaffChatScreen> {
+  RealtimeChannel? _messageChannel;
   bool _isLoading = false;
   List<Map<String, dynamic>> _residents = [];
   Map<String, dynamic>? _selectedResident;
@@ -21,67 +25,93 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
   void initState() {
     super.initState();
     _loadResidents();
+    _setupMessageSubscription();
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _messageChannel?.unsubscribe();
     super.dispose();
+  }
+
+  void _setupMessageSubscription() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final staffId = authProvider.userProfile?['id'];
+    if (staffId == null) return;
+
+    _messageChannel = Supabase.instance.client
+        .channel('public:messages')
+        .onPostgresChanges(event: PostgresChangeEvent.insert, schema: 'public', table: 'messages', callback: (payload) {
+
+      final newMessage = payload.newRecord;
+
+      if (_selectedResident != null &&
+          ((newMessage['sender_id'] == staffId &&
+                  newMessage['receiver_id'] == _selectedResident!['id']) ||
+              (newMessage['sender_id'] == _selectedResident!['id'] &&
+                  newMessage['receiver_id'] == staffId))) {
+        final formattedMessage = {
+          'id': newMessage['id'].toString(),
+          'sender_id': newMessage['sender_id'],
+          'sender_type':
+              newMessage['sender_id'] == staffId ? 'staff' : 'resident',
+          'message': newMessage['content'],
+          'timestamp': newMessage['created_at'],
+        };
+
+        if (mounted) {
+          setState(() {
+            _messages.add(formattedMessage);
+          });
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        }
+      }
+    });
+    _messageChannel?.subscribe();
   }
 
   Future<void> _loadResidents() async {
     setState(() => _isLoading = true);
-    
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final staffId = authProvider.userProfile?['id'];
-      
       if (staffId == null) {
         throw Exception('Staff ID not found');
       }
 
-      // TODO: Implement resident fetching in AuthProvider
-      // Only fetch residents from rooms managed by this staff member
-      // _residents = await authProvider.getStaffResidents(staffId);
-      
-      // Mock data for demonstration
-      _residents = [
-        {
-          'id': '1',
-          'name': 'John Doe',
-          'email': 'john@example.com',
-          'room_number': '101',
-          'phone': '+1234567890',
-          'last_message': 'Thank you for fixing the AC!',
-          'last_message_time': '2024-01-25T14:30:00Z',
-          'unread_count': 0,
-          'avatar': null,
-        },
-        {
-          'id': '2',
-          'name': 'Jane Smith',
-          'email': 'jane@example.com',
-          'room_number': '102',
-          'phone': '+1234567891',
-          'last_message': 'Can you help with the WiFi issue?',
-          'last_message_time': '2024-01-25T16:45:00Z',
-          'unread_count': 2,
-          'avatar': null,
-        },
-        {
-          'id': '3',
-          'name': 'Mike Johnson',
-          'email': 'mike@example.com',
-          'room_number': '104',
-          'phone': '+1234567892',
-          'last_message': 'Good morning!',
-          'last_message_time': '2024-01-25T09:15:00Z',
-          'unread_count': 1,
-          'avatar': null,
-        },
-      ];
-      
+      final contacts = await StaffService.getStaffChatContacts(staffId);
+
+      // Transform data to match the UI widget's expected structure
+      _residents = contacts.map((contact) {
+        final resident = contact['residents'] ?? {};
+        final room = contact['rooms'] ?? {};
+        return {
+          'id': resident['id'],
+          'name': resident['full_name'] ?? 'N/A',
+          'email': resident['email'] ?? 'N/A',
+          'room_number': room['room_number'] ?? 'N/A',
+          'phone': resident['phone'] ?? 'N/A',
+          'last_message': 'Tap to start chatting...', // Placeholder
+          'last_message_time': DateTime.now().toIso8601String(), // Placeholder
+          'unread_count': 0, // Placeholder
+          'avatar': null, // Placeholder
+        };
+      }).toList();
+
+      if (_residents.isNotEmpty) {
+        _selectResident(_residents.first);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -92,66 +122,43 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _loadMessages(String residentId) async {
     setState(() => _isLoading = true);
-    
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final staffId = authProvider.userProfile?['id'];
-      
       if (staffId == null) {
         throw Exception('Staff ID not found');
       }
 
-      // TODO: Implement message fetching in AuthProvider
-      // _messages = await authProvider.getChatMessages(staffId, residentId);
-      
-      // Mock data for demonstration
-      _messages = [
-        {
-          'id': '1',
-          'sender_id': residentId,
-          'sender_type': 'resident',
-          'message': 'Hi, I have an issue with my room AC',
-          'timestamp': '2024-01-25T10:00:00Z',
-          'read': true,
-        },
-        {
-          'id': '2',
-          'sender_id': staffId,
-          'sender_type': 'staff',
-          'message': 'Hello! I\'ll send someone to check it right away.',
-          'timestamp': '2024-01-25T10:05:00Z',
-          'read': true,
-        },
-        {
-          'id': '3',
-          'sender_id': residentId,
-          'sender_type': 'resident',
-          'message': 'Thank you for fixing the AC!',
-          'timestamp': '2024-01-25T14:30:00Z',
-          'read': true,
-        },
-      ];
-      
-      // Mark messages as read
-      // TODO: Implement mark as read functionality
-      
+      final fetchedMessages = await ChatService.getMessages(
+        senderId: staffId,
+        receiverId: residentId,
+      );
+
+      // Transform data
+      _messages = fetchedMessages.map((msg) {
+        return {
+          'id': msg['id'].toString(),
+          'sender_id': msg['sender_id'],
+          'sender_type': msg['sender_id'] == staffId ? 'staff' : 'resident',
+          'message': msg['content'],
+          'timestamp': msg['created_at'],
+        };
+      }).toList();
+
       // Scroll to bottom
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
         }
       });
-      
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -162,51 +169,57 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
-    if (message.isEmpty || _selectedResident == null) return;
+    if (message.isEmpty || _selectedResident == null) {
+      return;
+    }
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final staffId = authProvider.userProfile?['id'];
+    if (staffId == null) return;
+
+    final residentId = _selectedResident!['id'];
+
+    // Add message to local list immediately for better UX
+    final tempMessage = {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'sender_id': staffId,
+      'sender_type': 'staff',
+      'message': message,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    setState(() {
+      _messages.add(tempMessage);
+    });
+    _messageController.clear();
+
+    // Scroll to bottom
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final staffId = authProvider.userProfile?['id'];
-      
-      if (staffId == null) {
-        throw Exception('Staff ID not found');
-      }
-
-      // Add message to local state immediately for better UX
-      final newMessage = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'sender_id': staffId,
-        'sender_type': 'staff',
-        'message': message,
-        'timestamp': DateTime.now().toIso8601String(),
-        'read': true,
-      };
-
-      setState(() {
-        _messages.add(newMessage);
-        _messageController.clear();
-      });
-
-      // Scroll to bottom
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-
-      // TODO: Implement message sending in AuthProvider
-      // await authProvider.sendMessage(staffId, _selectedResident!['id'], message);
-      
+      await ChatService.sendMessage(
+        senderId: staffId,
+        receiverId: residentId,
+        content: message,
+      );
+      // Optionally, refresh messages from server to get real ID and timestamp
+      // await _loadMessages(residentId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -215,6 +228,10 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
             backgroundColor: Colors.red,
           ),
         );
+        // Remove the message if sending failed
+        setState(() {
+          _messages.remove(tempMessage);
+        });
       }
     }
   }
@@ -251,9 +268,11 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectedResident != null 
-            ? 'Chat with ${_selectedResident!['name']}'
-            : 'Resident Chat'),
+        title: Text(
+          _selectedResident != null
+              ? 'Chat with ${_selectedResident!['name']}'
+              : 'Resident Chat',
+        ),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         actions: [
@@ -264,7 +283,7 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _selectedResident != null 
+            onPressed: _selectedResident != null
                 ? () => _loadMessages(_selectedResident!['id'])
                 : _loadResidents,
           ),
@@ -284,7 +303,9 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
-                    border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey[300]!),
+                    ),
                   ),
                   child: const Row(
                     children: [
@@ -304,91 +325,94 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
                   child: _isLoading && _residents.isEmpty
                       ? const Center(child: CircularProgressIndicator())
                       : _residents.isEmpty
-                          ? const Center(
-                              child: Text('No residents found'),
-                            )
-                          : ListView.builder(
-                              itemCount: _residents.length,
-                              itemBuilder: (context, index) {
-                                final resident = _residents[index];
-                                final isSelected = _selectedResident?['id'] == resident['id'];
-                                
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? Colors.indigo[50] : null,
-                                    border: Border(
-                                      bottom: BorderSide(color: Colors.grey[200]!),
-                                    ),
+                      ? const Center(child: Text('No residents found'))
+                      : ListView.builder(
+                          itemCount: _residents.length,
+                          itemBuilder: (context, index) {
+                            final resident = _residents[index];
+                            final isSelected =
+                                _selectedResident?['id'] == resident['id'];
+
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.indigo[50] : null,
+                                border: Border(
+                                  bottom: BorderSide(color: Colors.grey[200]!),
+                                ),
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.indigo,
+                                  child: Text(
+                                    resident['name'][0].toUpperCase(),
+                                    style: const TextStyle(color: Colors.white),
                                   ),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: Colors.indigo,
-                                      child: Text(
-                                        resident['name'][0].toUpperCase(),
-                                        style: const TextStyle(color: Colors.white),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      resident['name'],
-                                      style: TextStyle(
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Room ${resident['room_number']}'),
-                                        if (resident['last_message'] != null)
-                                          Text(
-                                            resident['last_message'],
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    trailing: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        if (resident['unread_count'] > 0)
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Text(
-                                              resident['unread_count'].toString(),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        if (resident['last_message_time'] != null)
-                                          Text(
-                                            _formatTime(resident['last_message_time']),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    onTap: () => _selectResident(resident),
+                                ),
+                                title: Text(
+                                  resident['name'],
+                                  style: TextStyle(
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Room ${resident['room_number']}'),
+                                    if (resident['last_message'] != null)
+                                      Text(
+                                        resident['last_message'],
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (resident['unread_count'] > 0)
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Text(
+                                          resident['unread_count'].toString(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    if (resident['last_message_time'] != null)
+                                      Text(
+                                        _formatTime(
+                                          resident['last_message_time'],
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[500],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                onTap: () => _selectResident(resident),
+                              ),
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
           ),
-          
+
           // Chat Area (Right Panel)
           Expanded(
             child: _selectedResident == null
@@ -396,14 +420,15 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
                         SizedBox(height: 16),
                         Text(
                           'Select a resident to start chatting',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -415,27 +440,31 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
                         child: _isLoading && _messages.isEmpty
                             ? const Center(child: CircularProgressIndicator())
                             : _messages.isEmpty
-                                ? const Center(
-                                    child: Text('No messages yet'),
-                                  )
-                                : ListView.builder(
-                                    controller: _scrollController,
-                                    padding: const EdgeInsets.all(16),
-                                    itemCount: _messages.length,
-                                    itemBuilder: (context, index) {
-                                      final message = _messages[index];
-                                      final isFromStaff = message['sender_type'] == 'staff';
-                                      
-                                      return _buildMessageBubble(message, isFromStaff);
-                                    },
-                                  ),
+                            ? const Center(child: Text('No messages yet'))
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _messages.length,
+                                itemBuilder: (context, index) {
+                                  final message = _messages[index];
+                                  final isFromStaff =
+                                      message['sender_type'] == 'staff';
+
+                                  return _buildMessageBubble(
+                                    message,
+                                    isFromStaff,
+                                  );
+                                },
+                              ),
                       ),
-                      
+
                       // Message Input Area
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          border: Border(top: BorderSide(color: Colors.grey[300]!)),
+                          border: Border(
+                            top: BorderSide(color: Colors.grey[300]!),
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -459,7 +488,10 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
                               onPressed: _sendMessage,
                               backgroundColor: Colors.indigo,
                               mini: true,
-                              child: const Icon(Icons.send, color: Colors.white),
+                              child: const Icon(
+                                Icons.send,
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),

@@ -95,8 +95,92 @@ class StaffService {
     }
   }
 
+  // Booking/Reservation Management Methods
+  static Future<List<Map<String, dynamic>>> getStaffBookings(String staffId) async {
+    try {
+      final response = await _supabase
+          .from('bookings')
+          .select('''
+            *,
+            room:rooms!inner(
+              id,
+              room_number,
+              room_type,
+              rent_amount
+            ),
+            bed:beds(
+              id,
+              bed_number
+            ),
+            resident:profiles!bookings_resident_id_fkey(
+              id,
+              full_name,
+              phone,
+              email
+            )
+          ''')
+          .eq('rooms.staff_id', staffId)
+          .order('created_at', ascending: false);
+      
+      print('Staff bookings fetched: ${response.length} bookings found for staff $staffId');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching staff bookings: $e');
+      return [];
+    }
+  }
+
+  static Future<void> updateBookingStatus({
+    required String bookingId,
+    required String status,
+  }) async {
+    try {
+      await _supabase
+          .from('bookings')
+          .update({'status': status})
+          .eq('id', bookingId);
+      
+      print('Booking $bookingId status updated to $status');
+    } catch (e) {
+      print('Error updating booking status: $e');
+      throw Exception('Failed to update booking status: $e');
+    }
+  }
+
+  // Chat functionality for staff
+  static Future<List<Map<String, dynamic>>> getStaffChatContacts(String staffId) async {
+    try {
+      // Get all residents who have bookings in this staff member's rooms
+      final response = await _supabase
+          .from('bookings')
+          .select('''
+            resident:profiles!bookings_resident_id_fkey(
+              id,
+              full_name,
+              phone,
+              email
+            )
+          ''')
+          .eq('rooms.staff_id', staffId)
+          .eq('status', 'active');
+      
+      // Remove duplicates and extract resident info
+      final uniqueResidents = <String, Map<String, dynamic>>{};
+      for (final booking in response) {
+        final resident = booking['resident'];
+        if (resident != null) {
+          uniqueResidents[resident['id']] = resident;
+        }
+      }
+      
+      return uniqueResidents.values.toList();
+    } catch (e) {
+      print('Error fetching staff chat contacts: $e');
+      return [];
+    }
+  }
+
   // Other staff methods
   // - Update maintenance request status
   // - Create announcements
-  // - Get chat conversations
 }

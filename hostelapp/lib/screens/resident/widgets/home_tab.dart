@@ -82,12 +82,12 @@ class HomeTab extends StatelessWidget {
                   _buildActionCard(context, Icons.payment, 'Pay Rent', () {}),
                 if (authProvider.activeBooking != null)
                   _buildActionCard(context, Icons.build, 'New Request', onCreateNewRequest),
-                _buildActionCard(
-                  context,
-                  Icons.campaign,
-                  'Announcements',
-                  () => Navigator.pushNamed(context, '/announcements'),
-                ),
+                // _buildActionCard(
+                //   context,
+                //   Icons.campaign,
+                //   'Announcements',
+                //   () => Navigator.pushNamed(context, '/announcements'),
+                // ),
                 _buildActionCard(
                   context,
                   Icons.contact_support_outlined,

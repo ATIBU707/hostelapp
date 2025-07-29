@@ -15,6 +15,8 @@ class AuthProvider extends ChangeNotifier {
   List<Map<String, dynamic>>? _availableRooms;
   List<Map<String, dynamic>>? _staffMembers;
   List<Map<String, dynamic>>? _staffMaintenanceRequests;
+  List<Map<String, dynamic>> _staffBookings = [];
+  List<Map<String, dynamic>> get staffBookings => _staffBookings;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -86,7 +88,7 @@ class AuthProvider extends ChangeNotifier {
         await _loadPayments();
         await _loadMaintenanceRequests();
       }
-      await _loadAnnouncements();
+      // await _loadAnnouncements();
     } catch (e) {
       _setError('Failed to load resident data: ${_getErrorMessage(e)}');
     } finally {
@@ -231,19 +233,20 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _loadAnnouncements() async {
-    try {
-      _announcements = await ResidentService.getAnnouncements();
-    } catch (e) {
-      _setError('Failed to load announcements: ${_getErrorMessage(e)}');
-    }
+    // try {
+    //   _announcements = await ResidentService.getAnnouncements();
+    // } catch (e) {
+    //   _setError('Failed to load announcements: ${_getErrorMessage(e)}');
+    // }
   }
 
   Future<void> fetchAvailableRooms() async {
     _setLoading(true);
+    _clearError();
     try {
       _availableRooms = await ResidentService.getAvailableRooms();
     } catch (e) {
-      _setError(_getErrorMessage(e));
+      _setError('Failed to load available rooms: ${_getErrorMessage(e)}');
     } finally {
       _setLoading(false);
       notifyListeners();
@@ -255,14 +258,25 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _clearError();
     try {
+      print('Creating booking for user ${_user!.id}, room $roomId, bed $bedId');
+      
       await ResidentService.createBooking(
         residentId: _user!.id,
         roomId: roomId,
         bedId: bedId,
       );
+      
+      print('Booking created successfully');
+      
+      // Refresh all relevant data
       await _loadInitialData();
+      await fetchAvailableRooms(); // Refresh available rooms
+      
+      print('Data refreshed after booking');
     } catch (e) {
-      _setError(_getErrorMessage(e));
+      print('Error in bookRoom: $e');
+      _setError('Failed to book room: ${_getErrorMessage(e)}');
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -369,34 +383,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
   
-  // Fetch available rooms for residents
-  // Future<void> fetchAvailableRooms() async {
-  //   _setLoading(true);
-  //   _clearError();
-    
-  //   try {
-  //     final response = await Supabase.instance.client
-  //         .from('rooms')
-  //         .select('''
-  //           *,
-  //           beds!inner(
-  //             id,
-  //             bed_number,
-  //             is_available
-  //           )
-  //         ''')
-  //         .eq('status', 'available');
-      
-  //     _availableRooms = List<Map<String, dynamic>>.from(response);
-      
-  //   } catch (e) {
-  //     _setError('Failed to load available rooms: ${_getErrorMessage(e)}');
-  //   } finally {
-  //     _setLoading(false);
-  //     notifyListeners();
-  //   }
-  // }
-  
+  Future<void> fetchStaffBookings() async {
+    if (_user == null || userRole != 'staff') return;
+    _setLoading(true);
+    _clearError();
+    try {
+      _staffBookings = await StaffService.getStaffBookings(_user!.id);
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to load staff bookings: ${_getErrorMessage(e)}');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Fetch rooms managed by current staff member
   Future<List<Map<String, dynamic>>> fetchStaffRooms() async {
     if (_user == null || userRole != 'staff') {

@@ -19,8 +19,7 @@ class ResidentService {
           ''')
           .eq('resident_id', userId)
           .eq('status', 'active')
-          .limit(1)
-          .single();
+          .maybeSingle();
 
       return response;
     } catch (e) {
@@ -97,18 +96,86 @@ class ResidentService {
     }
   }
 
-  // Fetch all rooms with available beds
+  // Fetch all rooms with available beds from all staff members
   static Future<List<Map<String, dynamic>>> getAvailableRooms() async {
     try {
+      print('Fetching available rooms...');
+      
+      // Let's try the most basic query first to get all rooms
+      final allRoomsResponse = await _supabase
+          .from('rooms')
+          .select('*')
+          .eq('is_available', true);
+      
+      print('All available rooms count: ${allRoomsResponse.length}');
+      
+      // Now get rooms with beds
       final response = await _supabase
           .from('rooms')
-          .select('*, beds!inner(*)')
-          .eq('beds.is_available', true);
+          .select('''
+            *,
+            beds(
+              id,
+              bed_number,
+              is_available
+            ),
+            profiles!rooms_staff_id_fkey(
+              id,
+              full_name,
+              phone,
+              role
+            )
+          ''')
+          .eq('is_available', true)
+          .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response);
+      print('Rooms with beds fetched: ${response.length} rooms found');
+      
+      // Filter rooms that have at least one available bed
+      final roomsWithAvailableBeds = response.where((room) {
+        final beds = room['beds'] as List?;
+        if (beds == null || beds.isEmpty) {
+          print('Room ${room['room_number']} has no beds');
+          return false;
+        }
+        
+        final availableBeds = beds.where((bed) => bed['is_available'] == true).toList();
+        print('Room ${room['room_number']} has ${availableBeds.length} available beds out of ${beds.length} total beds');
+        
+        return availableBeds.isNotEmpty;
+      }).toList();
+      
+      print('Final rooms with available beds: ${roomsWithAvailableBeds.length}');
+      return roomsWithAvailableBeds;
+      
     } catch (e) {
       print('Error fetching available rooms: $e');
-      return [];
+      print('Error type: ${e.runtimeType}');
+      
+      // Try a very basic fallback
+      try {
+        print('Trying basic fallback query...');
+        final fallbackResponse = await _supabase
+            .from('rooms')
+            .select('*')
+            .eq('is_available', true);
+        
+        print('Basic fallback successful: ${fallbackResponse.length} rooms found');
+        
+        // Add empty beds array for compatibility
+        final roomsWithEmptyBeds = fallbackResponse.map((room) {
+          return {
+            ...room,
+            'beds': [],
+            'profiles': null,
+          };
+        }).toList();
+        
+        return roomsWithEmptyBeds;
+      } catch (fallbackError) {
+        print('All queries failed: $fallbackError');
+        return [];
+      }
     }
   }
 
@@ -119,13 +186,40 @@ class ResidentService {
     required int bedId,
   }) async {
     try {
-      await _supabase.rpc('create_booking_and_update_bed', params: {
+      print('Creating booking with params: residentId=$residentId, roomId=$roomId, bedId=$bedId');
+      
+      // Call the stored procedure to create booking and update bed availability
+      final result = await _supabase.rpc('create_booking_and_update_bed', params: {
         'p_resident_id': residentId,
         'p_room_id': roomId,
         'p_bed_id': bedId,
       });
+      
+      print('Booking created successfully: $result');
+      
+      // Verify the booking was created by fetching it
+      final verification = await _supabase
+          .from('bookings')
+          .select('id, status, monthly_rent')
+          .eq('resident_id', residentId)
+          .eq('room_id', roomId)
+          .eq('bed_id', bedId)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      
+      if (verification != null) {
+        print('Booking verification successful: ${verification['id']}');
+      } else {
+        print('Warning: Could not verify booking creation');
+      }
+      
     } catch (e) {
       print('Error creating booking: $e');
+      print('Error type: ${e.runtimeType}');
+      if (e is PostgrestException) {
+        print('PostgrestException details: ${e.message}, code: ${e.code}');
+      }
       rethrow;
     }
   }
