@@ -266,7 +266,7 @@ class ResidentService {
     return _supabase
         .from('messages')
         .stream(primaryKey: ['id'])
-        .order('created_at', ascending: true)
+        .order('created_at', ascending: false)
         .map((maps) => maps.where((map) => 
             (map['sender_id'] == senderId && map['receiver_id'] == receiverId) || 
             (map['sender_id'] == receiverId && map['receiver_id'] == senderId)

@@ -19,10 +19,31 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Scroll to the bottom when new messages arrive
+    ResidentService.getChatMessages(widget.receiverId).listen((_) {
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.minScrollExtent,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -61,6 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 final messages = snapshot.data!;
 
                 return ListView.builder(
+                  controller: _scrollController,
                   reverse: true, // To show latest messages at the bottom
                   padding: const EdgeInsets.all(8.0),
                   itemCount: messages.length,
