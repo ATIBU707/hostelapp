@@ -58,7 +58,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 DropdownButtonFormField<String>(
                   value: category,
                   items: ['General', 'Plumbing', 'Electrical']
-                      .map((label) => DropdownMenuItem(child: Text(label), value: label))
+                      .map((label) => DropdownMenuItem(value: label, child: Text(label)))
                       .toList(),
                   onChanged: (value) => category = value!,
                   decoration: const InputDecoration(labelText: 'Category'),

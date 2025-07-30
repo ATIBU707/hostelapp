@@ -140,7 +140,7 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
               itemCount: rooms.length,
               itemBuilder: (context, index) {
                 final room = rooms[index];
-                print('DEBUG: Processing room ${index}: ${room['room_number']}');
+                print('DEBUG: Processing room $index: ${room['room_number']}');
                 print('DEBUG: Room beds raw: ${room['beds']}');
                 
                 final beds = (room['beds'] as List)
@@ -384,7 +384,7 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                               ],
                             ),
                           );
-                        }).toList(),
+                        }),
                       ],
                     ),
                   ),

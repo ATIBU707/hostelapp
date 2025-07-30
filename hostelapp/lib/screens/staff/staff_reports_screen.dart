@@ -215,7 +215,7 @@ class _StaffReportsScreenState extends State<StaffReportsScreen> {
                 '${residents['total_residents'] ?? 0}',
                 Colors.purple,
                 Icons.people,
-                subtitle: '${residents['new_residents'] ?? 0} new this ${_selectedPeriod}',
+                subtitle: '${residents['new_residents'] ?? 0} new this $_selectedPeriod',
               ),
             ),
             const SizedBox(width: 12),
@@ -302,7 +302,7 @@ class _StaffReportsScreenState extends State<StaffReportsScreen> {
             ),
           )
         else
-          ...roomBreakdown.map((room) => _buildRoomCard(room as Map<String, dynamic>)).toList(),
+          ...roomBreakdown.map((room) => _buildRoomCard(room as Map<String, dynamic>)),
       ],
     );
   }

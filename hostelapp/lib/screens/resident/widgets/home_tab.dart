@@ -64,44 +64,51 @@ class HomeTab extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              children: [
-                if (authProvider.activeBooking == null)
-                  _buildActionCard(
+            Builder(
+              builder: (context) {
+                final bool hasApprovedBooking = authProvider.activeBooking != null;
+                final bool canBookRoom = !authProvider.residentBookings.any((b) => b['status'] == 'approved' || b['status'] == 'pending');
+
+                List<Widget> actionCards = [];
+
+                if (canBookRoom) {
+                  actionCards.add(_buildActionCard(
                     context,
                     Icons.king_bed_outlined,
                     'Book a Room',
                     () => Navigator.pushNamed(context, '/book-room'),
-                  ),
-                if (authProvider.activeBooking != null)
-                  _buildActionCard(context, Icons.payment, 'Pay Rent', () {}),
-                if (authProvider.activeBooking != null)
-                  _buildActionCard(context, Icons.build, 'New Request', onCreateNewRequest),
-                // _buildActionCard(
-                //   context,
-                //   Icons.campaign,
-                //   'Announcements',
-                //   () => Navigator.pushNamed(context, '/announcements'),
-                // ),
-                _buildActionCard(
+                  ));
+                }
+
+                if (hasApprovedBooking) {
+                  actionCards.addAll([
+                    _buildActionCard(context, Icons.payment, 'Pay Rent', () {}),
+                    _buildActionCard(context, Icons.build, 'New Request', onCreateNewRequest),
+                    _buildActionCard(
+                      context,
+                      Icons.receipt_long,
+                      'Payment History',
+                      () => onNavigateToTab(2),
+                    ),
+                  ]);
+                }
+
+                actionCards.add(_buildActionCard(
                   context,
                   Icons.contact_support_outlined,
                   'Contact Admin',
                   () => Navigator.pushNamed(context, '/staff-list'),
-                ),
-                if (authProvider.activeBooking != null)
-                  _buildActionCard(
-                    context,
-                    Icons.receipt_long,
-                    'Payment History',
-                    () => onNavigateToTab(2),
-                  ),
-              ],
+                ));
+
+                return GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  children: actionCards,
+                );
+              },
             ),
           ],
         );

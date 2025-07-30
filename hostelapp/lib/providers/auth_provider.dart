@@ -16,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
   List<Map<String, dynamic>>? _staffMembers;
   List<Map<String, dynamic>>? _staffMaintenanceRequests;
   List<Map<String, dynamic>> _residentBookings = [];
+  bool _hasApprovedBooking = false;
   List<Map<String, dynamic>> _staffBookings = [];
   List<Map<String, dynamic>> get staffBookings => _staffBookings;
   bool _isLoading = false;
@@ -24,7 +25,7 @@ class AuthProvider extends ChangeNotifier {
   // Getters for UI binding
   User? get user => _user;
   Map<String, dynamic>? get userProfile => _userProfile;
-  Map<String, dynamic>? get activeBooking => _activeBooking;
+  // Map<String, dynamic>? get activeBooking => _activeBooking;
   List<Map<String, dynamic>>? get payments => _payments;
   List<Map<String, dynamic>>? get maintenanceRequests => _maintenanceRequests;
   List<Map<String, dynamic>>? get announcements => _announcements;
@@ -32,6 +33,15 @@ class AuthProvider extends ChangeNotifier {
   List<Map<String, dynamic>>? get staffMembers => _staffMembers;
   List<Map<String, dynamic>>? get staffMaintenanceRequests => _staffMaintenanceRequests;
   List<Map<String, dynamic>> get residentBookings => _residentBookings;
+  bool get hasApprovedBooking => _hasApprovedBooking;
+
+  Map<String, dynamic>? get activeBooking {
+    try {
+      return _residentBookings.firstWhere((booking) => booking['status'] == 'approved');
+    } catch (e) {
+      return null;
+    }
+  }
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _user != null;
@@ -261,6 +271,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       _residentBookings = await ResidentService.getResidentBookings();
+      _hasApprovedBooking = _residentBookings.any((booking) => booking['status'] == 'approved');
     } catch (e) {
       _setError('Failed to load your bookings: ${_getErrorMessage(e)}');
     } finally {

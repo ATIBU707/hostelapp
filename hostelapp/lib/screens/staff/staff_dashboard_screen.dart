@@ -95,9 +95,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
                   value: 'logout',
                   child: Row(
                     children: [
-                      const Icon(Icons.logout, size: 20),
-                      const SizedBox(width: 8),
-                      const Text('Logout'),
+                      Icon(Icons.logout, size: 20),
+                      SizedBox(width: 8),
+                      Text('Logout'),
                     ],
                   ),
                 ),
