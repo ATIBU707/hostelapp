@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'chat_service.dart';
 
 class ResidentService {
   static final _supabase = Supabase.instance.client;
@@ -263,14 +264,9 @@ class ResidentService {
   // Fetch chat messages between two users
   static Stream<List<Map<String, dynamic>>> getChatMessages(String receiverId) {
     final senderId = _supabase.auth.currentUser!.id;
-    return _supabase
-        .from('messages')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .map((maps) => maps.where((map) => 
-            (map['sender_id'] == senderId && map['receiver_id'] == receiverId) || 
-            (map['sender_id'] == receiverId && map['receiver_id'] == senderId)
-        ).toList());
+    // Note: The resident chat screen uses a reversed ListView, so we poll and then reverse the list.
+    return ChatService.getMessagesPolling(senderId, receiverId)
+        .map((messages) => messages.reversed.toList());
   }
 
   // Send a new message
@@ -281,15 +277,10 @@ class ResidentService {
     final senderId = _supabase.auth.currentUser?.id;
     if (senderId == null) return;
 
-    try {
-      await _supabase.from('messages').insert({
-        'sender_id': senderId,
-        'receiver_id': receiverId,
-        'content': content,
-      });
-    } catch (e) {
-      print('Error sending message: $e');
-      rethrow;
-    }
+    await ChatService.sendMessage(
+      senderId: senderId,
+      receiverId: receiverId,
+      content: content,
+    );
   }
 }
