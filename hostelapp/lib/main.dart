@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:provider/provider.dart';
 
@@ -17,9 +18,11 @@ import 'screens/staff/staff_dashboard_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await dotenv.load(fileName: ".env");
+
   await Supabase.initialize(
     url: 'https://oqluvwbcltmasmqtuvbm.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbHV2d2JjbHRtYXNtcXR1dmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1MDU5MzUsImV4cCI6MjA2OTA4MTkzNX0.L-V1hromigxU7VHS-Lezav_Vg6ct0S2ts5s0HxopXx4',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
   
   runApp(const HostelManagerApp());

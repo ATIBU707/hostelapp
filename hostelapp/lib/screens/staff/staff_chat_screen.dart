@@ -239,7 +239,7 @@ class _StaffChatScreenState extends State<StaffChatScreen> {
               ),
             ),
             title: Text(resident.name),
-            subtitle: const Text('Tap to start chatting...', maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: const Text('Chat', maxLines: 1, overflow: TextOverflow.ellipsis),
             onTap: () => _selectResident(resident),
           ),
         );
